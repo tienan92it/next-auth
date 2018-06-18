@@ -196,11 +196,12 @@ export default class {
         }
       })
       .then(data => {
-        if (data.success && data.success === true) {
-          return Promise.resolve(true)
-        } else {
-          return Promise.resolve(false)
-        }
+        // if (data.success && data.success === true) {
+        //   return Promise.resolve(true)
+        // } else {
+        //   return Promise.resolve(false)
+        // }
+        return Promise.resolve(data)
       })
   }
 

@@ -77,8 +77,8 @@ module.exports = (nextApp, {
     */
   }
 } = {}) => {
-  
-  if (typeof(functions) !== 'object') {
+
+  if (typeof (functions) !== 'object') {
     throw new Error('functions must be a an object')
   }
 
@@ -168,7 +168,7 @@ module.exports = (nextApp, {
 
     return res.json(session)
   })
-  
+
   /*
    * Return list of which accounts are already linked.
    * 
@@ -180,25 +180,25 @@ module.exports = (nextApp, {
     req.linked = () => {
       return new Promise((resolve, reject) => {
         if (!req.user) return resolve({})
-          
+
         functions.serialize(req.user)
-        .then(id => {
-          if (!id) throw new Error("Unable to serialize user")
-          return functions.find({ id: id })
-        })
-        .then(user => {
-          if (!user) return resolve({})
-        
-          let linkedAccounts = {}
-          providers.forEach(provider => {
-            linkedAccounts[provider.providerName] = (user[provider.providerName.toLowerCase()]) ? true : false
+          .then(id => {
+            if (!id) throw new Error("Unable to serialize user")
+            return functions.find({ id: id })
           })
-          
-          return resolve(linkedAccounts)
-        })
-        .catch(err => {
-          return reject(err)
-        })  
+          .then(user => {
+            if (!user) return resolve({})
+
+            let linkedAccounts = {}
+            providers.forEach(provider => {
+              linkedAccounts[provider.providerName] = (user[provider.providerName.toLowerCase()]) ? true : false
+            })
+
+            return resolve(linkedAccounts)
+          })
+          .catch(err => {
+            return reject(err)
+          })
       })
     }
     next()
@@ -211,22 +211,22 @@ module.exports = (nextApp, {
     // Note: We don't use the User object in req.user directly as it is a
     // a simplified set of properties set by functions.deserialize().
     functions.serialize(req.user)
-    .then(id => {
-      return functions.find({ id: id })
-    })
-    .then(user => {
-      if (!user) return res.json({})
-        
-      let linkedAccounts = {}
-      providers.forEach(provider => {
-        linkedAccounts[provider.providerName] = (user[provider.providerName.toLowerCase()]) ? true : false
+      .then(id => {
+        return functions.find({ id: id })
       })
-      
-      return res.json(linkedAccounts)
-    })
-    .catch(err => {
-      return res.status(500).end()
-    })
+      .then(user => {
+        if (!user) return res.json({})
+
+        let linkedAccounts = {}
+        providers.forEach(provider => {
+          linkedAccounts[provider.providerName] = (user[provider.providerName.toLowerCase()]) ? true : false
+        })
+
+        return res.json(linkedAccounts)
+      })
+      .catch(err => {
+        return res.status(500).end()
+      })
   })
 
   /*
@@ -247,7 +247,7 @@ module.exports = (nextApp, {
           }
         })
         return resolve(configuredProviders)
-      })    
+      })
     }
     next()
   })
@@ -276,30 +276,32 @@ module.exports = (nextApp, {
         form: req.body,
         req: req
       })
-      .then(user => {
-        if (user) {
-          // If signIn() returns a user, sign in as them
-          req.logIn(user, (err) => {
-            if (err) return res.redirect(`${pathPrefix}/error?action=signin&type=credentials`)
-            if (req.xhr) {
-              // If AJAX request (from client with JS), return JSON response
-              return res.json({success: true})
-            } else {
-              // If normal form POST (from client without JS) return redirect
-              return res.redirect(`${pathPrefix}/callback?action=signin&service=credentials`)
-            }
-          })
-        } else {
-          // If no user object is returned, bounce back to the sign in page
-          return res.redirect(`${pathPrefix}`)
-        }
-      })
-      .catch(err => {
-        return res.redirect(`${pathPrefix}/error?action=signin&type=credentials`)
-      })
+        .then(result => {
+          if (result.code == ErrorCode.SUCCESS) {
+            // If signIn() returns a user, sign in as them
+            let user = result.user
+            req.logIn(user, (err) => {
+              if (err) return res.redirect(`${pathPrefix}/error?action=signin&type=credentials`)
+              if (req.xhr) {
+                // If AJAX request (from client with JS), return JSON response
+                return res.json(result)
+              } else {
+                // If normal form POST (from client without JS) return redirect
+                return res.redirect(`${pathPrefix}/callback?action=signin&service=credentials`)
+              }
+            })
+          } else {
+            // If no user object is returned, bounce back to the sign in page
+            // return res.redirect(`${pathPrefix}`)
+            return res.json(result)
+          }
+        })
+        .catch(err => {
+          return res.redirect(`${pathPrefix}/error?action=signin&type=credentials`)
+        })
     })
   }
-  
+
   /*
    * Enable /auth/email/signin  routes if sendSignInEmail() function is passed
    */
@@ -310,7 +312,7 @@ module.exports = (nextApp, {
     expressApp.post(`${pathPrefix}/email/signin`, (req, res) => {
       const email = req.body.email || null
       const userData = req.body
-    
+
       if (!email || email.trim() === '') {
         res.redirect(`${pathPrefix}`)
       }
@@ -320,50 +322,50 @@ module.exports = (nextApp, {
 
       // Create verification token save it to database
       functions.find({ email: email })
-      .then(user => {
-        if (user) {
+        .then(user => {
+          if (user) {
 
-          return Promise.resolve({
-            code: ErrorCode.ACCOUNT_EXISTS,
-            message: 'Email already exists',
-            user: user
-          })
-          // If a user with that email address exists already, update token.
-          // user.emailToken = token
-          // return functions.update(user)
-        } else {
-          // If the user does not exist, create a new account with the token.
-          return functions.insert({
-            emailToken: token,
-            ...userData
-          }).then(user => {
             return Promise.resolve({
-              code: ErrorCode.SUCCESS,
-              message: '',
+              code: ErrorCode.ACCOUNT_EXISTS,
+              message: 'Email already exists',
               user: user
             })
-          }).catch(err => {
-            return Promise.reject(err)
-          })
-        }
-      })
-      .then(result => {
-        functions.sendSignInEmail({
-          email: result.user.email,
-          url: url,
-          req: req
+            // If a user with that email address exists already, update token.
+            // user.emailToken = token
+            // return functions.update(user)
+          } else {
+            // If the user does not exist, create a new account with the token.
+            return functions.insert({
+              emailToken: token,
+              ...userData
+            }).then(user => {
+              return Promise.resolve({
+                code: ErrorCode.SUCCESS,
+                message: '',
+                user: user
+              })
+            }).catch(err => {
+              return Promise.reject(err)
+            })
+          }
         })
-        if (req.xhr) {
-          // If AJAX request (from client with JS), return JSON response
-          return res.json(result)
-        } else {
-          // If normal form POST (from client without JS) return redirect
-          return res.redirect(`${pathPrefix}/check-email?email=${email}`)
-        }
-      })
-      .catch(err => {
-        return res.redirect(`${pathPrefix}/error?action=signin&type=email&email=${email}`)
-      })
+        .then(result => {
+          functions.sendSignInEmail({
+            email: result.user.email,
+            url: url,
+            req: req
+          })
+          if (req.xhr) {
+            // If AJAX request (from client with JS), return JSON response
+            return res.json(result)
+          } else {
+            // If normal form POST (from client without JS) return redirect
+            return res.redirect(`${pathPrefix}/check-email?email=${email}`)
+          }
+        })
+        .catch(err => {
+          return res.redirect(`${pathPrefix}/error?action=signin&type=email&email=${email}`)
+        })
     })
 
     /*
@@ -375,33 +377,33 @@ module.exports = (nextApp, {
       }
 
       functions.find({ emailToken: req.params.token })
-      .then(user => {
-        if (user) {
-          // Delete current token so it cannot be used again
-          delete user.emailToken
-          // Mark email as verified now we know they have access to it
-          user.emailVerified = true
-          return functions.update(user, null, { delete: 'emailToken' })
-        } else {
-          return Promise.reject(new Error("Token not valid"))
-        }
-      })
-      .then(user => {
-        // If the user object is valid, sign the user in
-        req.logIn(user, (err) => {
-          if (err) return res.redirect(`${pathPrefix}/error?action=signin&type=token-invalid`)
-          if (req.xhr) {
-            // If AJAX request (from client with JS), return JSON response
-            return res.json({success: true})
+        .then(user => {
+          if (user) {
+            // Delete current token so it cannot be used again
+            delete user.emailToken
+            // Mark email as verified now we know they have access to it
+            user.emailVerified = true
+            return functions.update(user, null, { delete: 'emailToken' })
           } else {
-            // If normal form POST (from client without JS) return redirect
-            return res.redirect(`${pathPrefix}/callback?action=signin&service=email`)
+            return Promise.reject(new Error("Token not valid"))
           }
         })
-      })
-      .catch(err => {
-        return res.redirect(`${pathPrefix}/error?action=signin&type=token-invalid`)
-      })
+        .then(user => {
+          // If the user object is valid, sign the user in
+          req.logIn(user, (err) => {
+            if (err) return res.redirect(`${pathPrefix}/error?action=signin&type=token-invalid`)
+            if (req.xhr) {
+              // If AJAX request (from client with JS), return JSON response
+              return res.json({ success: true })
+            } else {
+              // If normal form POST (from client without JS) return redirect
+              return res.redirect(`${pathPrefix}/callback?action=signin&service=email`)
+            }
+          })
+        })
+        .catch(err => {
+          return res.redirect(`${pathPrefix}/error?action=signin&type=token-invalid`)
+        })
     })
   }
 
@@ -425,10 +427,10 @@ module.exports = (nextApp, {
       providers: providers,
       port: port
     }
-    
+
     // If no port specified, don't start Express automatically
     if (!port) return resolve(response)
-    
+
     // If an instance of nextApp was passed, have it handle all other routes
     if (nextApp) {
       expressApp.all('*', (req, res) => {
@@ -436,7 +438,7 @@ module.exports = (nextApp, {
         return nextRequestHandler(req, res)
       })
     }
-    
+
     // Start Express
     return expressApp.listen(port, err => {
       if (err) reject(err)
