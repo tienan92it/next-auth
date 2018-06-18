@@ -6,6 +6,7 @@ const ExpressSession = require('express-session')
 const lusca = require('lusca')
 const passportStrategies = require('./src/passport-strategies')
 const uuid = require('uuid/v4')
+const ErrorCode = require('./src/ErrorCode')
 
 module.exports = (nextApp, {
   bodyParser = true,
@@ -308,6 +309,7 @@ module.exports = (nextApp, {
      */
     expressApp.post(`${pathPrefix}/email/signin`, (req, res) => {
       const email = req.body.email || null
+      const userData = req.body
     
       if (!email || email.trim() === '') {
         res.redirect(`${pathPrefix}`)
@@ -320,26 +322,40 @@ module.exports = (nextApp, {
       functions.find({ email: email })
       .then(user => {
         if (user) {
+
+          return Promise.resolve({
+            code: ErrorCode.ACCOUNT_EXISTS,
+            message: 'Email already exists',
+            user: user
+          })
           // If a user with that email address exists already, update token.
-          user.emailToken = token
-          return functions.update(user)
+          // user.emailToken = token
+          // return functions.update(user)
         } else {
           // If the user does not exist, create a new account with the token.
           return functions.insert({
-            email: email,
-            emailToken: token
+            emailToken: token,
+            ...userData
+          }).then(user => {
+            return Promise.resolve({
+              code: ErrorCode.SUCCESS,
+              message: '',
+              user: user
+            })
+          }).catch(err => {
+            return Promise.reject(err)
           })
         }
       })
-      .then(user => {
+      .then(result => {
         functions.sendSignInEmail({
-          email: user.email,
+          email: result.user.email,
           url: url,
           req: req
         })
         if (req.xhr) {
           // If AJAX request (from client with JS), return JSON response
-          return res.json({success: true})
+          return res.json(result)
         } else {
           // If normal form POST (from client without JS) return redirect
           return res.redirect(`${pathPrefix}/check-email?email=${email}`)

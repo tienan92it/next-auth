@@ -59,28 +59,28 @@ export default class {
     return fetch('/auth/session', {
       credentials: 'same-origin'
     })
-    .then(response => {
-      if (response.ok) {
-        return response
-      } else {
-        return Promise.reject(Error('HTTP error when trying to get session'))
-      }
-    })
-    .then(response => response.json())
-    .then(data => {
-      // Update session with session info
-      session = data
+      .then(response => {
+        if (response.ok) {
+          return response
+        } else {
+          return Promise.reject(Error('HTTP error when trying to get session'))
+        }
+      })
+      .then(response => response.json())
+      .then(data => {
+        // Update session with session info
+        session = data
 
-      // Set a value we will use to check this client should silently
-      // revalidate, using the value for revalidateAge returned by the server.
-      session.expires = Date.now() + session.revalidateAge
+        // Set a value we will use to check this client should silently
+        // revalidate, using the value for revalidateAge returned by the server.
+        session.expires = Date.now() + session.revalidateAge
 
-      // Save changes to session
-      this._saveLocalStore('session', session)
+        // Save changes to session
+        this._saveLocalStore('session', session)
 
-      return session
-    })
-    .catch(() => Error('Unable to get session'))
+        return session
+      })
+      .catch(() => Error('Unable to get session'))
   }
 
   /**
@@ -90,16 +90,16 @@ export default class {
     return fetch('/auth/csrf', {
       credentials: 'same-origin'
     })
-    .then(response => {
-      if (response.ok) {
-        return response
-      } else {
-        return Promise.reject(Error('Unexpected response when trying to get CSRF token'))
-      }
-    })
-    .then(response => response.json())
-    .then(data => data.csrfToken)
-    .catch(() => Error('Unable to get CSRF token'))
+      .then(response => {
+        if (response.ok) {
+          return response
+        } else {
+          return Promise.reject(Error('Unexpected response when trying to get CSRF token'))
+        }
+      })
+      .then(response => response.json())
+      .then(data => data.csrfToken)
+      .catch(() => Error('Unable to get CSRF token'))
   }
 
   /**
@@ -110,23 +110,23 @@ export default class {
   } = {}) {
     // If running server side, uses server side method
     if (req) return req.linked()
-    
+
     // If running client side, use RESTful endpoint
     return fetch('/auth/linked', {
       credentials: 'same-origin'
     })
-    .then(response => {
-      if (response.ok) {
-        return response
-      } else {
-        return Promise.reject(Error('Unexpected response when trying to get linked accounts'))
-      }
-    })
-    .then(response => response.json())
-    .then(data => data)
-    .catch(() => Error('Unable to get linked accounts'))
+      .then(response => {
+        if (response.ok) {
+          return response
+        } else {
+          return Promise.reject(Error('Unexpected response when trying to get linked accounts'))
+        }
+      })
+      .then(response => response.json())
+      .then(data => data)
+      .catch(() => Error('Unable to get linked accounts'))
   }
-  
+
   /**
    * A static method to get list of currently configured oAuth providers
    **/
@@ -135,21 +135,21 @@ export default class {
   } = {}) {
     // If running server side, uses server side method
     if (req) return req.providers()
-    
+
     // If running client side, use RESTful endpoint
     return fetch('/auth/providers', {
       credentials: 'same-origin'
     })
-    .then(response => {
-      if (response.ok) {
-        return response
-      } else {
-        return Promise.reject(Error('Unexpected response when trying to get oAuth providers'))
-      }
-    })
-    .then(response => response.json())
-    .then(data => data)
-    .catch(() => Error('Unable to get oAuth providers'))
+      .then(response => {
+        if (response.ok) {
+          return response
+        } else {
+          return Promise.reject(Error('Unexpected response when trying to get oAuth providers'))
+        }
+      })
+      .then(response => response.json())
+      .then(data => data)
+      .catch(() => Error('Unable to get oAuth providers'))
   }
 
 
@@ -169,11 +169,11 @@ export default class {
     const formData = (typeof params === 'string') ? { email: params } : params
 
     // Use either the email token generation route or the custom form auth route
-    const route = (typeof params === 'string') ? '/auth/email/signin' : '/auth/signin' 
+    const route = (typeof params === 'string') ? '/auth/email/signin' : '/auth/signin'
 
     // Add latest CSRF Token to request
     formData._csrf = await this.csrfToken()
-    
+
     // Encoded form parser for sending data in the body
     const encodedForm = Object.keys(formData).map((key) => {
       return encodeURIComponent(key) + '=' + encodeURIComponent(formData[key])
@@ -188,20 +188,66 @@ export default class {
       body: encodedForm,
       credentials: 'same-origin'
     })
-    .then(async response => {
-      if (response.ok) {
-        return await response.json()
-      } else {
-        throw new Error('HTTP error while attempting to sign in')
-      }
+      .then(async response => {
+        if (response.ok) {
+          return await response.json()
+        } else {
+          throw new Error('HTTP error while attempting to sign in')
+        }
+      })
+      .then(data => {
+        if (data.success && data.success === true) {
+          return Promise.resolve(true)
+        } else {
+          return Promise.resolve(false)
+        }
+      })
+  }
+
+  /**
+   * Sign up
+   */
+  static async signup(params) {
+    // Params can be just string (an email address) or an object (form fields)
+    // const formData = (typeof params === 'string') ? { email: params } : params
+    const formData = params
+
+    // Use either the email token generation route or the custom form auth route
+    // const route = (typeof params === 'string') ? '/auth/email/signin' : '/auth/signin'
+    const route = '/auth/email/signin'
+
+    // Add latest CSRF Token to request
+    formData._csrf = await this.csrfToken()
+
+    // Encoded form parser for sending data in the body
+    const encodedForm = Object.keys(formData).map((key) => {
+      return encodeURIComponent(key) + '=' + encodeURIComponent(formData[key])
+    }).join('&')
+
+    return fetch(route, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+        'X-Requested-With': 'XMLHttpRequest' // So Express can detect AJAX post
+      },
+      body: encodedForm,
+      credentials: 'same-origin'
     })
-    .then(data => {
-      if (data.success && data.success === true) {
-        return Promise.resolve(true)
-      } else {
-        return Promise.resolve(false)
-      }
-    })
+      .then(async response => {
+        if (response.ok) {
+          return await response.json()
+        } else {
+          throw new Error('HTTP error while attempting to sign in')
+        }
+      })
+      .then(data => {
+        // if (data.success && data.success === true) {
+        //   return Promise.resolve(true)
+        // } else {
+        //   return Promise.resolve(false)
+        // }
+        return Promise.resolve(data)
+      })
   }
 
   static async signout() {
@@ -213,7 +259,7 @@ export default class {
     const encodedForm = Object.keys(formData).map((key) => {
       return encodeURIComponent(key) + '=' + encodeURIComponent(formData[key])
     }).join('&')
-    
+
     // Remove cached session data
     this._removeLocalStore('session')
 
@@ -225,10 +271,10 @@ export default class {
       body: encodedForm,
       credentials: 'same-origin'
     })
-    .then(() => {
-      return true
-    })
-    .catch(() => Error('Unable to sign out'))
+      .then(() => {
+        return true
+      })
+      .catch(() => Error('Unable to sign out'))
   }
 
   // The Web Storage API is widely supported, but not always available (e.g.
@@ -241,7 +287,7 @@ export default class {
       return null
     }
   }
-  
+
   static _saveLocalStore(name, data) {
     try {
       localStorage.setItem(name, JSON.stringify(data))
@@ -250,7 +296,7 @@ export default class {
       return false
     }
   }
-  
+
   static _removeLocalStore(name) {
     try {
       localStorage.removeItem(name)
