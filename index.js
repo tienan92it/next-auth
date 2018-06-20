@@ -322,13 +322,11 @@ module.exports = (nextApp, {
 
       // Create verification token save it to database
       functions.find({ email: email })
-        .then(user => {
-          if (user) {
+        .then(data => {
+          if (data) {
 
             return Promise.resolve({
-              code: ErrorCode.ACCOUNT_EXISTS,
-              message: 'Email already exists',
-              user: user
+              data: data
             })
             // If a user with that email address exists already, update token.
             // user.emailToken = token
@@ -338,11 +336,9 @@ module.exports = (nextApp, {
             return functions.insert({
               emailToken: token,
               ...userData
-            }).then(user => {
+            }).then(data => {
               return Promise.resolve({
-                code: ErrorCode.SUCCESS,
-                message: '',
-                user: user
+                data: data
               })
             }).catch(err => {
               return Promise.reject(err)
