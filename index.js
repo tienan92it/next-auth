@@ -342,17 +342,18 @@ module.exports = (nextApp, {
                 data: data
               })
             }).catch(err => {
-              console.log('Error...', err)
               return Promise.reject(err)
             })
           }
         })
         .then(result => {
-          functions.sendSignInEmail({
-            email: result.user.email,
-            url: url,
-            req: req
-          })
+          if (result.code == 200) {
+            functions.sendSignInEmail({
+              email: result.user.email,
+              url: url,
+              req: req
+            })
+          }
           if (req.xhr) {
             // If AJAX request (from client with JS), return JSON response
             return res.json(result)
