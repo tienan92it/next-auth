@@ -337,6 +337,7 @@ module.exports = (nextApp, {
               emailToken: token,
               ...userData
             }).then(data => {
+              console.log('Account was created...', data)
               return Promise.resolve({
                 data: data
               })
