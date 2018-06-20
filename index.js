@@ -342,6 +342,7 @@ module.exports = (nextApp, {
                 data: data
               })
             }).catch(err => {
+              console.log('Error...', err)
               return Promise.reject(err)
             })
           }
