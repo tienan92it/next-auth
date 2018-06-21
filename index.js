@@ -70,11 +70,12 @@ module.exports = (nextApp, {
       req = null
     } = {}) => { Promise.resolve(true) }
     */
-    signIn: null /* ({
+    signIn: null, /* ({
       email = null,
       password = null
     } = {}) => { Promise.resolve(user) }
     */
+    verifyUser: null
   }
 } = {}) => {
 
@@ -272,6 +273,7 @@ module.exports = (nextApp, {
   if (functions.signIn) {
     expressApp.post(`${pathPrefix}/signin`, (req, res) => {
       // Passes all supplied credentials to the signIn function
+      console.log('.........', req.body)
       functions.signIn({
         form: req.body,
         req: req
@@ -279,7 +281,7 @@ module.exports = (nextApp, {
         .then(result => {
           if (result.code == ErrorCode.SUCCESS) {
             // If signIn() returns a user, sign in as them
-            let user = result.user
+            let user = result.data
             req.logIn(user, (err) => {
               if (err) return res.redirect(`${pathPrefix}/error?action=signin&type=credentials`)
               if (req.xhr) {
@@ -321,47 +323,37 @@ module.exports = (nextApp, {
       const url = (serverUrl || `${req.protocol}://${req.headers.host}`) + `${pathPrefix}/email/signin/${token}`
 
       // Create verification token save it to database
-      functions.find({ email: email })
-        .then(data => {
-          if (data) {
-
-            return Promise.resolve({
-              data: data
-            })
-            // If a user with that email address exists already, update token.
-            // user.emailToken = token
-            // return functions.update(user)
-          } else {
-            // If the user does not exist, create a new account with the token.
-            return functions.insert({
-              emailToken: token,
-              ...userData
-            }).then(data => {
-              console.log('Account was created...', data)
-              return Promise.resolve({
-                data: data
-              })
-            }).catch(err => {
-              return Promise.reject(err)
-            })
-          }
-        })
-        .then(result => {
-          if (result.code == 200) {
-            functions.sendSignInEmail({
-              email: result.user.email,
-              url: url,
-              req: req
-            })
-          }
-          if (req.xhr) {
-            // If AJAX request (from client with JS), return JSON response
-            return res.json(result)
-          } else {
-            // If normal form POST (from client without JS) return redirect
-            return res.redirect(`${pathPrefix}/check-email?email=${email}`)
-          }
-        })
+      // functions.find({ email: email })
+      //   .then(data => {
+      //     if (data) {
+      //       console.log('Account existed...', data)
+      //       return Promise.resolve({data})
+      //       // If a user with that email address exists already, update token.
+      //       // user.emailToken = token
+      //       // return functions.update(user)
+      //     } else {
+      // If the user does not exist, create a new account with the token.
+      functions.insert({
+        email_token: token,
+        ...userData
+      }).then(data => {
+        return Promise.resolve(data)
+      }).then(result => {
+        if (result.code == 200) {
+          functions.sendSignInEmail({
+            email: userData.email,
+            url: url,
+            req: req
+          })
+        }
+        if (req.xhr) {
+          // If AJAX request (from client with JS), return JSON response
+          return res.json(result)
+        } else {
+          // If normal form POST (from client without JS) return redirect
+          return res.redirect(`${pathPrefix}/check-email?email=${email}`)
+        }
+      })
         .catch(err => {
           return res.redirect(`${pathPrefix}/error?action=signin&type=email&email=${email}`)
         })
@@ -370,40 +362,53 @@ module.exports = (nextApp, {
     /*
      * Verify token in callback URL for email sign in 
      */
-    expressApp.get(`${pathPrefix}/email/signin/:token`, (req, res) => {
-      if (!req.params.token) {
-        return res.redirect(`${pathPrefix}/error?action=signin&type=token-missing`)
-      }
+    if (functions.verifyUser) {
+      expressApp.get(`${pathPrefix}/email/signin/:token`, (req, res) => {
+        if (!req.params.token) {
+          return res.redirect(`${pathPrefix}/error?action=signin&type=token-missing`)
+        }
 
-      functions.find({ emailToken: req.params.token })
-        .then(user => {
-          if (user) {
-            // Delete current token so it cannot be used again
-            delete user.emailToken
-            // Mark email as verified now we know they have access to it
-            user.emailVerified = true
-            return functions.update(user, null, { delete: 'emailToken' })
-          } else {
-            return Promise.reject(new Error("Token not valid"))
-          }
-        })
-        .then(user => {
-          // If the user object is valid, sign the user in
-          req.logIn(user, (err) => {
-            if (err) return res.redirect(`${pathPrefix}/error?action=signin&type=token-invalid`)
-            if (req.xhr) {
-              // If AJAX request (from client with JS), return JSON response
-              return res.json({ success: true })
+        functions.find({ email_token: req.params.token })
+          .then(user => {
+            if (user) {
+              // Delete current token so it cannot be used again
+              // console.log('verify user...', user)
+              // delete user.email_token
+              // Mark email as verified now we know they have access to it
+              // user.email_verified = true
+              return new Promise((resolve, reject) => {
+                functions.verifyUser(req.params.token)
+                  .then(response => {
+                    if (response.code == 200) {
+                      return resolve(user.data)
+                    } else {
+                      return reject(new Error("Token not valid"))
+                    }
+                  })
+              })
             } else {
-              // If normal form POST (from client without JS) return redirect
-              return res.redirect(`${pathPrefix}/callback?action=signin&service=email`)
+              return Promise.reject(new Error("Token not valid"))
             }
           })
-        })
-        .catch(err => {
-          return res.redirect(`${pathPrefix}/error?action=signin&type=token-invalid`)
-        })
-    })
+          .then(user => {
+            console.log('verify user...', user)
+            // If the user object is valid, sign the user in
+            req.logIn(user, (err) => {
+              if (err) return res.redirect(`${pathPrefix}/error?action=signin&type=token-invalid`)
+              if (req.xhr) {
+                // If AJAX request (from client with JS), return JSON response
+                return res.json({ success: true })
+              } else {
+                // If normal form POST (from client without JS) return redirect
+                return res.redirect(`${pathPrefix}/callback?action=signin&service=email`)
+              }
+            })
+          })
+          .catch(err => {
+            return res.redirect(`${pathPrefix}/error?action=signin&type=token-invalid`)
+          })
+      })
+    }
   }
 
   /*
