@@ -92,6 +92,13 @@ module.exports = ({
         }
 
         // Look for a user in the database associated with this account.
+        // console.log('social provider neeee.....', {
+        //   provider: {
+        //     name: providerName.toLowerCase(),
+        //     id: profile.id
+        //   }
+        // })
+
         functions.find({
           provider: {
             name: providerName.toLowerCase(),
@@ -99,6 +106,9 @@ module.exports = ({
           }
         })
           .then(user => {
+            // console.log('social user ne....', user)
+
+            // console.log('req user ne....', req.user)
             if (req.user) {
               // This section handles scenarios when a user is already signed in.
 
@@ -199,7 +209,7 @@ module.exports = ({
                 // This section handles senarios where the user is not logged in
                 // but they seem to have an account already, so we sign them in
                 // as that user.
-                console.log('testing..', user)
+                // console.log('testing..', user)
                 // Update Access and Refresh Tokens for the user if we got them.
                 if (access_token || refresh_token) {
                   if (access_token) user.data.access_token = access_token
@@ -234,7 +244,24 @@ module.exports = ({
                     // potential security exploit allowing someone to pre-register 
                     // or create an account elsewhere for another users email 
                     // address then trying to sign in from it, so don't do that.
-                    if (user.data) return next(null, false)
+                    if (user.data) {
+                      //update social id
+                      // console.log('update social id....', user.data)
+                      if (user.data.sign_up_with == 'google' || user.data.sign_up_with == 'facebook') {
+                        user.data.access_token = access_token
+                        user.data.refresh_token = refresh_token
+                        user.data.social_id = profile.id
+                        return functions.update(user.data, _profile)
+                          .then(user => {
+                            return next(null, user)
+                          })
+                          .catch(err => {
+                            return next(err, false)
+                          })
+                      } else {
+                        return next(null, false)
+                      }
+                    }
 
                     // If an account does not exist, create one for them and return
                     // a user object to passport, which will sign them in.

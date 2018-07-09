@@ -20,7 +20,7 @@ module.exports = (nextApp, {
   // Express Session (optional).
   expressSession = ExpressSession,
   // Secret used to encrypt session data on the server.
-  sessionSecret = 'change-me',
+  sessionSecret = 'tstmkrs@2018',
   // Session store for express-session. 
   // Defaults to an in memory store, which is not recommended for production.
   sessionStore = expressSession.MemoryStore(),
@@ -273,7 +273,7 @@ module.exports = (nextApp, {
   if (functions.signIn) {
     expressApp.post(`${pathPrefix}/signin`, (req, res) => {
       // Passes all supplied credentials to the signIn function
-      console.log('.........', req.body)
+      // console.log('.........', req.body)
       functions.signIn({
         form: req.body,
         req: req
@@ -391,7 +391,7 @@ module.exports = (nextApp, {
             }
           })
           .then(user => {
-            console.log('verify user...', user)
+            // console.log('verify user...', user)
             // If the user object is valid, sign the user in
             req.logIn(user, (err) => {
               if (err) return res.redirect(`${pathPrefix}/error?action=signin&type=token-invalid`)
@@ -409,6 +409,72 @@ module.exports = (nextApp, {
           })
       })
     }
+  } else {
+    /*
+     * Generate a one time use sign in link and email it to the user
+     */
+    expressApp.post(`${pathPrefix}/email/signin`, (req, res) => {
+      const email = req.body.email || null
+      const userData = req.body
+
+      if (!email || email.trim() === '') {
+        res.redirect(`${pathPrefix}`)
+      }
+
+      // const token = uuid()
+      // const url = (serverUrl || `${req.protocol}://${req.headers.host}`) + `${pathPrefix}/email/signin/${token}`
+
+      // Create verification token save it to database
+      // functions.find({ email: email })
+      //   .then(data => {
+      //     if (data) {
+      //       console.log('Account existed...', data)
+      //       return Promise.resolve({data})
+      //       // If a user with that email address exists already, update token.
+      //       // user.emailToken = token
+      //       // return functions.update(user)
+      //     } else {
+      // If the user does not exist, create a new account with the token.
+      functions.insert({
+        // email_token: token,
+        ...userData
+      }).then(data => {
+        return Promise.resolve(data)
+      }).then(result => {
+        // if (result.code == 200) {
+        //   functions.sendSignInEmail({
+        //     email: userData.email,
+        //     url: url,
+        //     req: req
+        //   })
+        // }
+        // console.log('insert xong ne...', result)
+        // If the user object is valid, sign the user in
+        if (result.code == 200) {
+          req.logIn(result.data, (err) => {
+            if (err) return res.json({})
+            if (req.xhr) {
+              // If AJAX request (from client with JS), return JSON response
+              return res.json(result)
+            } else {
+              // If normal form POST (from client without JS) return redirect
+              return res.redirect(`${pathPrefix}/callback?action=signin&service=email`)
+            }
+          })
+        } else {
+          if (req.xhr) {
+            // If AJAX request (from client with JS), return JSON response
+            return res.json(result)
+          } else {
+            // If normal form POST (from client without JS) return redirect
+            return res.redirect(`${pathPrefix}/check-email?email=${email}`)
+          }
+        }
+      })
+        .catch(err => {
+          return res.redirect(`${pathPrefix}/error?action=signin&type=email&email=${email}`)
+        })
+    })
   }
 
   /*
